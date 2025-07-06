@@ -1,0 +1,76 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+#    image: confluentinc/cp-kafka:7.0.0
+    image: confluentinc/cp-kafka:7.6.0
+    ports:
+      - "9092:9092"
+    environment:
+#      KAFKA_ADVERTISED_HOST_NAME: localhost
+      KAFKA_BROKER_ID: 1
+#      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_MESSAGE_MAX_BYTES: 200000000
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+
+  mongo:
+    container_name: mongo
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: test
+#      MONGO_INITDB_ROOT_PASSWORD: 12345
+
+#  mongo-express:
+#    image: mongo-express:latest
+#    restart: always
+ #   ports:
+#      - "8081:8081"
+#    environment:
+#      ME_CONFIG_BASICAUTH: "false"
+#      ME_CONFIG_MONGODB_SERVER: mongo
+#     ME_CONFIG_MONGODB_ADMINUSERNAME: test
+#      ME_CONFIG_MONGODB_ADMINPASSWORD: 12345
+#      ME_CONFIG_MONGODB_URL: "mongodb://test:12345@mongo:27017"
+#    depends_on:
+#      - mongo
+
+  app:
+    build: .
+    container_name: faust-app
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: faust -A main worker -l info
+    depends_on:
+      - kafka
+      - mongo
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MONGO_URI: mongodb://mongo:27017
+
+  producer:
+    build: .
+    container_name: kafka-csv-producer
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python csv_kafka_producer.py
+    depends_on:
+      - kafka
+
+volumes:
+  mongo-data:
